@@ -7,19 +7,48 @@ function M.find_split_position(sentence, max_width)
     if string.len(sentence) <= max_width then
         return string.len(sentence)
     end
-    local word_pattern = "%f[%w]%w-%f[%W]"
-    local i ---@type integer?
-    local j = 0 ---@type integer?
-    repeat
-        i = j
-        i, j = string.find(sentence, word_pattern, i + 1)
-    until j > max_width
-    -- If sentence consists of single word > max_width
-    if i == 1 then
-        ---@cast j integer
-        return j
-    else
-        return i - 1
+    local word_pattern = "%S+"
+    local link_pattern = "%[.-%]%(.-%)"
+
+    local block_start = 1 ---@type integer? Visible begin of current block
+    local block_end ---@type integer?       Visible end of current block
+    local conceal_end ---@type integer?     Concealed end of current block
+
+
+    while true do
+        local word_start, word_end = string.find(sentence, word_pattern, block_start)
+        local link_start, link_end = string.find(sentence, link_pattern, block_start)
+
+        if not link_start or word_start < link_start then
+            -- next block is word
+            if word_end <= max_width then
+                block_start = word_end + 1
+            else
+                if block_start == 1 then
+                    return math.min(word_end + 1, sentence:len())
+                else
+                    return word_start - 1
+                end
+            end
+        else
+            -- next block is markdown link
+            local link_desc_end = string.find(sentence, "%]%(", link_start)
+            -- Concealed cols don't contribute to `max_width` (+2 is for `[]`)
+            if link_desc_end <= max_width + 2 then
+                block_start = link_end + 1
+                max_width = max_width + (link_end - link_desc_end) + 2
+            else
+                if block_start == 1 then
+                    return math.min(link_end + 1, sentence:len())
+                else
+                    return link_start - 1
+                end
+            end
+        end
+
+        if block_start > sentence:len() then
+            return sentence:len()
+        end
     end
 end
 

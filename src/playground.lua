@@ -1,7 +1,7 @@
 local sentence_splitter = require("src.sentence-splitter")
 
 local function main()
-    local split_position = sentence_splitter.split_sentence("Hello", 3)
+    local splits_long = sentence_splitter.split_sentence("start [desc](link) end", 10)
 end
 
 main()
