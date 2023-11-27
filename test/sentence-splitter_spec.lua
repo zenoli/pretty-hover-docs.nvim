@@ -33,13 +33,18 @@ describe("sentence-splitter", function()
                 28,
                 sentence_splitter.find_split_position(sentence, 40)
             )
-        end)
-
-        it("should allow markdown links to violate `max_width` constraint", function()
             assert.equals(19, sentence_splitter.find_split_position("start [desc](link) end", 10))
             assert.equals(6, sentence_splitter.find_split_position("start [desc](link) end", 9))
             assert.equals(32, sentence_splitter.find_split_position("start [desc](link) [desc](link) end", 15))
             assert.equals(35, sentence_splitter.find_split_position("start [desc](link) [desc](link) end", 19))
+        end)
+
+        it("should handle markdown formatting", function()
+            assert.equals(8, sentence_splitter.find_split_position("**foo** bar baz", 3))
+            assert.equals(12, sentence_splitter.find_split_position("**foo** bar baz", 7))
+            assert.equals(10, sentence_splitter.find_split_position("`foo` bar baz", 7))
+            assert.equals(14, sentence_splitter.find_split_position("***foo*** bar baz", 7))
+            assert.equals(30, sentence_splitter.find_split_position("`foo` *foo* **foo** ***foo*** foo", 15))
         end)
     end)
 
@@ -107,6 +112,25 @@ describe("sentence-splitter", function()
             assert.equals(2, #splits_short)
             assert.equals("This is a text containing a", splits_short[1])
             assert.equals("[markdown link](https://www.example.com) and some text after", splits_short[2])
+        end)
+
+        it("should handle basic markdown sentences", function()
+            local expected_splits = {
+                "This is a ***sample*** text containing",
+                "amongst other, [links](https://www.example.com), and  also",
+                "other cool stuff such as",
+                "`inline math`, *italics*, **bold** and",
+                "***bold-italic*** text."
+            }
+            local computed_splits = sentence_splitter.split_sentence(
+                table.concat(expected_splits, " "),
+                32
+            )
+
+            assert.equals(#expected_splits, #computed_splits)
+            for i, _ in ipairs(computed_splits) do
+                assert.equals(expected_splits[i], computed_splits[i])
+            end
         end)
     end)
 end)

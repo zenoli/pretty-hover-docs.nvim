@@ -1,5 +1,10 @@
 local M = {}
 
+local function count_stars(sentence, block_start)
+    local s, e = string.find(sentence, "[%*`]*", block_start)
+    return e - s + 1
+end
+
 local function find_next_match_type(matches)
     local match_start
     local current_match_type = nil
@@ -22,7 +27,8 @@ function M.find_split_position(sentence, max_width)
     end
     local word_pattern = "%S+"
     local link_pattern = "%[.-%]%(.-%)"
-    local fmt_pattern = "%*.-%*"
+    -- local fmt_pattern = "([%*`]*).+%1"
+    local fmt_pattern = "([%*`]+).-%1"
 
     local search_start = 1 ---@type integer? Visible begin of current block
 
@@ -45,6 +51,20 @@ function M.find_split_position(sentence, max_width)
                     return math.min(matches.word[2] + 1, sentence:len())
                 else
                     return matches.word[1] - 1
+                end
+            end
+        elseif match_type == "fmt" then
+            local n_fmt_chars = count_stars(sentence, matches.fmt[1])
+
+            if matches.fmt[2] <= max_width + n_fmt_chars * 2 then
+                search_start = matches.fmt[2] + 1
+                local n_conceal_columns = n_fmt_chars * 2
+                max_width = max_width + n_conceal_columns
+            else
+                if search_start == 1 then
+                    return math.min(matches.fmt[2] + 1, sentence:len())
+                else
+                    return matches.fmt[1] - 1
                 end
             end
         else
