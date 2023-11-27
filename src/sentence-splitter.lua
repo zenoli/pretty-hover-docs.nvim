@@ -3,8 +3,9 @@ local M = {}
 local function find_next_match_type(matches)
     local match_start
     local current_match_type = nil
-    for match_type, match_block in pairs(matches) do
-        if match_block[1] and (match_block[1] < (match_start or match_block[1] + 1)) then
+    for _, match_type in ipairs { "link", "fmt", "word" } do
+        local match_block = matches[match_type]
+        if match_block[1] and (not match_start or match_block[1] < match_start) then
             current_match_type = match_type
             match_start = match_block[1]
         end
@@ -30,7 +31,7 @@ function M.find_split_position(sentence, max_width)
         local matches = {
             link = { string.find(sentence, link_pattern, search_start) },
             word = { string.find(sentence, word_pattern, search_start) },
-            fmt = { string.find(sentence, fmt_pattern, search_start) }
+            fmt = { string.find(sentence, fmt_pattern, search_start) },
         }
 
         local match_type = find_next_match_type(matches)
