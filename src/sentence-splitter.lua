@@ -1,5 +1,17 @@
 local M = {}
 
+local function find_next_match_type(matches)
+    local match_start
+    local current_match_type = nil
+    for match_type, match_block in pairs(matches) do
+        if match_block[1] and (match_block[1] < (match_start or match_block[1] + 1)) then
+            current_match_type = match_type
+            match_start = match_block[1]
+        end
+    end
+    return current_match_type
+end
+
 ---@param sentence string Sentence to split
 ---@param max_width integer Max width constraint.
 ---@return integer split_position Indicates that `sentence` must be split from `[0, split_position]`
@@ -9,44 +21,49 @@ function M.find_split_position(sentence, max_width)
     end
     local word_pattern = "%S+"
     local link_pattern = "%[.-%]%(.-%)"
+    local fmt_pattern = "%*.-%*"
 
-    local block_start = 1 ---@type integer? Visible begin of current block
-    local block_end ---@type integer?       Visible end of current block
-    local conceal_end ---@type integer?     Concealed end of current block
+    local search_start = 1 ---@type integer? Visible begin of current block
 
 
     while true do
-        local word_start, word_end = string.find(sentence, word_pattern, block_start)
-        local link_start, link_end = string.find(sentence, link_pattern, block_start)
+        local matches = {
+            link = { string.find(sentence, link_pattern, search_start) },
+            word = { string.find(sentence, word_pattern, search_start) },
+            fmt = { string.find(sentence, fmt_pattern, search_start) }
+        }
 
-        if not link_start or word_start < link_start then
+        local match_type = find_next_match_type(matches)
+
+        if match_type == "word" then
             -- next block is word
-            if word_end <= max_width then
-                block_start = word_end + 1
+            if matches.word[2] <= max_width then
+                search_start = matches.word[2] + 1
             else
-                if block_start == 1 then
-                    return math.min(word_end + 1, sentence:len())
+                if search_start == 1 then
+                    return math.min(matches.word[2] + 1, sentence:len())
                 else
-                    return word_start - 1
+                    return matches.word[1] - 1
                 end
             end
         else
             -- next block is markdown link
-            local link_desc_end = string.find(sentence, "%]%(", link_start)
+            local link_desc_end = string.find(sentence, "%]%(", matches.link[1])
             -- Concealed cols don't contribute to `max_width` (+2 is for `[]`)
             if link_desc_end <= max_width + 2 then
-                block_start = link_end + 1
-                max_width = max_width + (link_end - link_desc_end) + 2
+                search_start = matches.link[2] + 1
+                local n_conceal_columns = (matches.link[2] - link_desc_end) + 2
+                max_width = max_width + n_conceal_columns
             else
-                if block_start == 1 then
-                    return math.min(link_end + 1, sentence:len())
+                if search_start == 1 then
+                    return math.min(matches.link[2] + 1, sentence:len())
                 else
-                    return link_start - 1
+                    return matches.link[1] - 1
                 end
             end
         end
 
-        if block_start > sentence:len() then
+        if search_start > sentence:len() then
             return sentence:len()
         end
     end
